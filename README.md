@@ -1,4 +1,4 @@
-# Turnstile CAPTCHA & Clearance Solver
+# Turnstile, cf_clearance, & AWS WAF Token Solver
 
 > Terinspirasi dari [SGAHSCAJASCJ/Turnstile-Solver](https://github.com/SGAHSCAJASCJ/Turnstile-Solver)
 
@@ -6,94 +6,60 @@ Solusi pemecahan CAPTCHA Cloudflare Turnstile, cf_clearance, dan AWS WAF Token b
 
 ---
 
-## ✨ Fitur
+## ✨ Fitur Utama
 
-| Fitur | Keterangan |
-|---|---|
-| 🔄 3 Endpoint Solver | `/turnstile`, `/clearance`, `/aws-token` |
-| 📦 Auto Install | Dependensi & browser Camoufox diinstall otomatis |
-| 🖥️ VPS Auto Setup | Deteksi & install python, pip, venv, browser deps otomatis di Linux |
-| ⚙️ Konfigurasi via `config.json` | Semua setting dari satu file + prompt interaktif |
-| 🔁 Proxy Rotation | Dukungan proxy per-thread dengan rotasi round-robin |
-| 🧹 Forced Cleanup | Cleanup berkala paksa (interval bisa diatur) meski ada worker aktif |
-| 🐛 Mode Debug | Aktifkan/matikan log detail via config |
-| 🪟 Windows / Linux / RDP | Kompatibel penuh di semua platform |
+- **3 Endpoint Solver**: `/turnstile`, `/clearance`, `/aws-token`
+- **Auto Install & Fetch**: Dependensi Python dan Camoufox diinstall otomatis saat pertama kali jalan.
+- **Konfigurasi via `config.json`**: Semua setting dapat diatur dari file atau prompt interaktif.
+- **Proxy Rotation**: Dukungan proxy per-instance browser dengan rotasi round-robin.
+- **Forced Cleanup**: Cleanup memori berkala paksa untuk kestabilan server di VPS ber-RAM kecil.
+- **Mode Headless & GUI**: Kompatibel untuk dijalankan via Terminal/VPS (`xvfb`) maupun RDP.
 
 ---
 
-## 📊 Metrik Performa
+## 🚀 Instalasi & Setup (Khusus VPS Baru)
 
-| Metrik | Nilai | Keterangan |
-|---|---|---|
-| Kapasitas Konkurensi | 500+ req/menit | Pool halaman asinkron |
-| Rata-rata Waktu Respons | 1,8 – 3 detik | Rata-rata per captcha |
-| Tingkat Keberhasilan | 99%+ | Dalam kondisi normal |
-| Penggunaan Memori | ~300 MB/halaman | Per instance browser |
+**Catatan:** *Masalah instalasi berulang (`camoufox fetch` error atau browser dependensi) di VPS baru biasanya disebabkan karena cache data browser yang belum lengkap.* Script versi terbaru sudah memperbaiki deteksi versi camoufox otomatis.
 
----
-
-## 🚀 Mulai Cepat
-
-### Persyaratan
-- Python 3.10+
-- Windows / Linux / macOS / RDP
-- RAM 2 GB+
-- Koneksi internet stabil
-
-### Instalasi & Menjalankan
-
-Ada **dua server** yang bisa dijalankan:
-
-| Server | File | Endpoint | Keterangan |
-|---|---|---|---|
-| **Solver** | `api_server.py` | `/turnstile`, `/clearance`, `/aws-token` | Solver lengkap (3 endpoint) |
+Langkah-langkah yang **paling disarankan** di VPS Linux (Ubuntu/Debian) baru:
 
 ```bash
-git clone https://github.com/najibyahya/Turnstile-Solver
-cd Turnstile-Solver
-
-# Server lengkap (turnstile + clearance + aws-token)
-python api_server.py
-```
-
-> Script akan otomatis menginstall semua dependensi (`fastapi==0.95.2`, `uvicorn`, `camoufox`, `loguru`, `psutil`) dan mengunduh browser Camoufox jika belum ada.
-
----
-
-## 🖥️ Setup VPS Linux Baru
-
-Script `api_server.py` sudah memiliki **auto-setup** yang akan mengecek dan menginstall kebutuhan VPS secara otomatis. Namun jika ingin setup manual:
-
-```bash
-# 1. Update system
+# 1. Update system & Install system dependencies browser
 sudo apt update -y && sudo apt upgrade -y
+sudo apt install -y xvfb libasound2 python3 python3-pip python3-venv
 
-# 2. Install Python 3.10+ (biasanya sudah ada di Ubuntu 22.04+)
-sudo apt install python3 python3-pip python3-venv -y
-
-# 3. Buat & aktifkan virtual environment
+# 2. Buat & Aktifkan virtual environment (sangat disarankan)
 python3 -m venv venv
 source venv/bin/activate
 
-# 4. Install module
-pip install fastapi==0.95.2 uvicorn camoufox loguru psutil
-
-# 5. Install browser dependencies
-python3 -m playwright install-deps
-
-# 6. Clone & jalankan
+# 3. Clone Repository
 git clone https://github.com/najibyahya/Turnstile-Solver
 cd Turnstile-Solver
-python3 api_server.py
+
+# 4. Install dependensi Python dasar
+pip install fastapi uvicorn "camoufox[fetch]" loguru psutil playwright
+
+# 5. FETCH & INSTALL DEPENDENCY MANUAL (LAKUKAN SEKALI SAJA)
+# Ini mencegah masalah "Version information not found" & "browser dependencies"
+python3 -m camoufox fetch
+python3 -m playwright install-deps
+
+# 6. Jalankan Server
+# (Gunakan xvfb-run jika VPS Anda tidak memiliki GUI/Display)
+xvfb-run -a python3 api_server.py
 ```
 
-> Jika menggunakan `headless: false`, jalankan dengan `xvfb-run -a python3 api_server.py`
+> **INFO:** Pada percobaan berikutnya, Anda cukup melakukan:
+> ```bash
+> source venv/bin/activate
+> xvfb-run -a python3 api_server.py
+> ```
 
 ---
 
 ## ⚙️ Konfigurasi (`config.json`)
 
-Edit file `config.json` sesuai kebutuhan **sebelum** menjalankan script, atau ubah langsung via prompt interaktif saat script berjalan.
+Ketika pertama kali dijalankan, script akan membuat `config.json`. Anda bisa mengubahnya langsung:
 
 ```json
 {
@@ -111,91 +77,51 @@ Edit file `config.json` sesuai kebutuhan **sebelum** menjalankan script, atau ub
 
 | Parameter | Tipe | Default | Keterangan |
 |---|---|---|---|
-| `headless` | bool | `true` | Browser berjalan tanpa tampilan (mode server) |
-| `thread` | int | `2` | Jumlah instance browser — jangan melebihi jumlah core CPU |
-| `page_count` | int | `1` | Jumlah halaman per instance browser |
-| `proxy_support` | bool | `false` | Aktifkan penggunaan proxy |
-| `proxy_file` | string | `proxies.txt` | Path file daftar proxy |
-| `host` | string | `0.0.0.0` | Host binding server |
-| `port` | int | `8000` | Port server |
-| `debug` | bool | `false` | Tampilkan log DEBUG detail |
-| `cleanup_interval_minutes` | int | `10` | Interval cleanup paksa dalam menit |
+| `headless` | bool | `true` | Browser berjalan tanpa tampilan GUI |
+| `thread` | int | `2` | Jumlah instance browser (disarankan max = jumlah core CPU) |
+| `page_count` | int | `1` | Jumlah tab/halaman per browser |
+| `proxy_support` | bool | `false` | Status penggunaan daftar proxy dari `proxies.txt` |
+| `cleanup_interval_minutes` | int | `10` | Jeda waktu sistem merefresh/membersihkan memori browser |
 
 ---
 
-## 🌐 Penggunaan Proxy
+## 🌐 Format Proxy (`proxies.txt`)
 
-### 1. Aktifkan di `config.json`
+Jika `proxy_support` dihidupkan, tambahkan proxy pada file `proxies.txt` (satu proxy tiap baris).
+Format yang didukung:
+```text
+http://ip:port
+http://user:pass@ip:port
+socks5://user:pass@ip:port
+```
+
+---
+
+## 📖 Endpoint Dokumentasi API
+
+Solver ini bekerja dengan cara asynchronous (membuat antrean tugas). Masing-masing endpoint memblokir proses sampai token sukses diambil atau dikembalikan dalam status gagal.
+
+### 1. Endpoint Task Pembuatan
+
+| Task | Endpoint | Parameter yang dibutuhkan |
+|---|---|---|
+| Turnstile | `GET /turnstile` | `url` (Target URL), `sitekey` (Turnstile Key) |
+| cf_clearance | `GET /clearance` | `url` (Target URL), `timeout` (opsional batas detik) |
+| AWS WAF | `GET /aws-token` | `url` (Target URL), `timeout` (opsional batas detik) |
+
+**Contoh Response Sukses (202 Accepted):**
 ```json
 {
-    "proxy_support": true,
-    "proxy_file": "proxies.txt"
+  "task_id": "8a31e...b41",
+  "status": "accepted"
 }
 ```
 
-### 2. Isi `proxies.txt` (satu proxy per baris)
-```
-# Tanpa autentikasi
-http://203.0.113.10:3128
-socks5://203.0.113.20:1080
+### 2. Endpoint Polling Hasil (`GET /result?id=<task_id>`)
 
-# Dengan autentikasi
-http://username:password@203.0.113.30:8080
-socks5://username:password@203.0.113.40:1080
-```
+Anda wajb melakukan **polling request** ke endpoint ini tiap (minimal) 1 detik menggunakan `task_id` dari pembuatan task di atas sampai `status` bernilai `success` atau `error`.
 
-Proxy akan dirotasi secara **round-robin** — setiap thread browser mendapat proxy yang berbeda.
-
----
-
-## 📖 Dokumentasi API
-
-### ➡️ Solve Turnstile CAPTCHA
-```http
-GET /turnstile?url=https://example.com&sitekey=0x4AAAAAAA...
-```
-
-| Parameter | Wajib | Keterangan |
-|---|---|---|
-| `url` | ✅ | URL halaman tempat Turnstile berada |
-| `sitekey` | ✅ | Sitekey Turnstile dari halaman tersebut |
-| `action` | ❌ | Nilai `data-action` (opsional) |
-| `cdata` | ❌ | Nilai `data-cdata` (opsional) |
-
----
-
-### ➡️ Get cf_clearance Cookie
-```http
-GET /clearance?url=https://example.com&timeout=30
-```
-
-| Parameter | Wajib | Keterangan |
-|---|---|---|
-| `url` | ✅ | URL target yang dilindungi Cloudflare |
-| `timeout` | ❌ | Waktu tunggu dalam detik (default: 30) |
-
----
-
-### ➡️ Get AWS WAF Token
-```http
-GET /aws-token?url=https://example.com&timeout=30
-```
-
-| Parameter | Wajib | Keterangan |
-|---|---|---|
-| `url` | ✅ | URL target yang dilindungi AWS WAF |
-| `timeout` | ❌ | Waktu tunggu dalam detik (default: 30) |
-
----
-
-### ➡️ Ambil Hasil
-```http
-GET /result?id=<task_id>
-```
-
-Semua endpoint solver (`/turnstile`, `/clearance`, `/aws-token`) mengembalikan `task_id`. Gunakan endpoint ini untuk poll hasilnya.
-
-**Respons `/turnstile` sukses:**
+**Contoh Response Sukses dari Turnstile:**
 ```json
 {
   "status": "success",
@@ -204,190 +130,39 @@ Semua endpoint solver (`/turnstile`, `/clearance`, `/aws-token`) mengembalikan `
 }
 ```
 
-**Respons `/clearance` sukses:**
+**Contoh Response Sukses dari cf_clearance/AWS WAF:**
 ```json
 {
   "status": "success",
   "elapsed_time": 3.102,
-  "cf_clearance": "abcdef123...",
   "user_agent": "Mozilla/5.0 ...",
-  "cookies": "cf_clearance=abcdef123; __cf_bm=xyz..."
+  "cookies": "cf_clearance=abcdef...;",
+  "cf_clearance": "abcdef..."
 }
 ```
 
-**Respons `/aws-token` sukses:**
-```json
-{
-  "status": "success",
-  "elapsed_time": 2.871,
-  "aws_waf_token": "eyJhbGci...",
-  "user_agent": "Mozilla/5.0 ...",
-  "cookies": "aws-waf-token=eyJhbGci...; ..."
-}
-```
+**Kode Status HTTP:**
+- `200` = Sukses.
+- `202` = Sedang diproses, terus lakukan request GET /result.
+- `404` = Task ID kadaluarsa atau tidak ditemukan.
+- `408` = Time Out (> 5 Menit memutar).
+- `500`/`422` = Eror di internal atau Captcha gagal disolve.
 
-**Kode status HTTP:**
-| Kode | Kondisi |
+---
+
+## ❗ Troubleshooting
+
+| Masalah | Solusi |
 |---|---|
-| `200` | Berhasil |
-| `202` | Masih diproses / diterima, coba lagi |
-| `404` | `task_id` tidak valid atau sudah expired |
-| `408` | Timeout (> 5 menit) |
-| `422` | Gagal diselesaikan |
-| `429` | Server penuh, coba lagi nanti |
-
----
-
-## 💻 Contoh Penggunaan
-
-### Python
-```python
-import requests
-import time
-
-BASE_URL = "http://localhost:8000"
-
-# ── Solve Turnstile ──
-def solve_turnstile(url: str, sitekey: str) -> str:
-    res = requests.get(f"{BASE_URL}/turnstile", params={"url": url, "sitekey": sitekey})
-    task_id = res.json()["task_id"]
-    while True:
-        result = requests.get(f"{BASE_URL}/result", params={"id": task_id}).json()
-        if result["status"] == "success":
-            return result["value"]
-        elif result["status"] == "error":
-            raise Exception(f"Gagal: {result.get('value')}")
-        time.sleep(1)
-
-# ── Get cf_clearance ──
-def get_clearance(url: str) -> dict:
-    res = requests.get(f"{BASE_URL}/clearance", params={"url": url})
-    task_id = res.json()["task_id"]
-    while True:
-        result = requests.get(f"{BASE_URL}/result", params={"id": task_id}).json()
-        if result["status"] == "success":
-            return result  # cf_clearance, user_agent, cookies
-        elif result["status"] == "error":
-            raise Exception(f"Gagal: {result.get('message')}")
-        time.sleep(1)
-
-# ── Get AWS WAF Token ──
-def get_aws_token(url: str) -> dict:
-    res = requests.get(f"{BASE_URL}/aws-token", params={"url": url})
-    task_id = res.json()["task_id"]
-    while True:
-        result = requests.get(f"{BASE_URL}/result", params={"id": task_id}).json()
-        if result["status"] == "success":
-            return result  # aws_waf_token, user_agent, cookies
-        elif result["status"] == "error":
-            raise Exception(f"Gagal: {result.get('message')}")
-        time.sleep(1)
-```
-
-### Node.js
-```javascript
-const axios = require("axios");
-
-const BASE_URL = "http://localhost:8000";
-
-async function pollResult(taskId) {
-  while (true) {
-    const { data: result } = await axios.get(`${BASE_URL}/result`, {
-      params: { id: taskId },
-    });
-    if (result.status === "success") return result;
-    if (result.status === "error") throw new Error(JSON.stringify(result));
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-}
-
-// Solve Turnstile
-async function solveTurnstile(url, sitekey) {
-  const { data } = await axios.get(`${BASE_URL}/turnstile`, {
-    params: { url, sitekey },
-  });
-  return pollResult(data.task_id);
-}
-
-// Get cf_clearance
-async function getClearance(url) {
-  const { data } = await axios.get(`${BASE_URL}/clearance`, {
-    params: { url },
-  });
-  return pollResult(data.task_id);
-}
-
-// Get AWS WAF Token
-async function getAwsToken(url) {
-  const { data } = await axios.get(`${BASE_URL}/aws-token`, {
-    params: { url },
-  });
-  return pollResult(data.task_id);
-}
-```
-
----
-
-## ❗ Referensi Error
-
-### Error saat startup
-
-| Error | Artinya | Solusi |
-|---|---|---|
-| `ModuleNotFoundError: No module named 'xxx'` | Dependensi belum terinstall | Jalankan ulang script, atau `pip install xxx --break-system-packages` |
-| `CalledProcessError: pip install returned non-zero` | pip diblokir sistem (Ubuntu 22.04+) | `pip install xxx --break-system-packages` atau pakai virtualenv |
-| `OSError: [Errno 98] Address already in use` | Port sudah dipakai proses lain | Ganti port di `config.json` atau matikan proses yang memakai port tersebut |
-
-### Error saat runtime (log)
-
-| Log | Artinya | Solusi |
-|---|---|---|
-| `Percobaan captcha X gagal: Timeout 400ms exceeded` | Captcha belum muncul / lambat load | Normal jika tidak terlalu sering |
-| `Pool halaman berhasil diinisialisasi, berisi 0 halaman` | Browser gagal membuat halaman | Cek RAM tersedia, kurangi `thread` atau `page_count` |
-| `proxy_support aktif tapi file 'proxies.txt' tidak ditemukan` | File proxy tidak ada | Buat file `proxies.txt` dengan daftar proxy |
-| `Server penuh, coba lagi nanti` | Semua slot browser sedang terpakai | Naikkan `thread` atau `page_count`, atau tunggu |
-
-### Kode HTTP response API
-
-| Kode | Artinya |
-|---|---|
-| `202` | Tugas diterima / masih diproses — poll ulang |
-| `400` | Parameter wajib tidak disertakan |
-| `404` | `task_id` tidak valid atau sudah expired |
-| `408` | Tugas timeout (> 5 menit) |
-| `422` | Gagal diselesaikan |
-| `429` | Server penuh — semua slot browser terpakai |
-| `500` | Error tak terduga di server |
-
----
-
-## 🔧 Tips Performa
-
-- **`thread`**: Sesuaikan dengan jumlah core CPU. Contoh: 8-core → maksimal `thread: 8`
-- **`page_count`**: Mulai dari `1`. Naikkan hanya jika RAM mencukupi (±300 MB per halaman)
-- **`cleanup_interval_minutes`**: Turunkan (misal `5`) jika RAM terbatas
-- **`debug: false`**: Matikan untuk output bersih di production
-- **Gunakan proxy** untuk meningkatkan tingkat keberhasilan di sitekey yang ketat
+| `Version information not found at /root/.cache/camoufox/version.json` | Script sudah di-update untuk mencegah ini. Jika masih terjadi, jalankan manual `python3 -m camoufox fetch`. |
+| Berulang menginstall `playwright install-deps` | Pastikan Anda memiliki hak *sudo/root* jika package diinstall via sistem, dan jalankan perintah install pip menggunakan Virtual Environment (`venv`), lalu install manual via `python3 -m playwright install-deps` |
+| `Pool halaman berisi 0 / task tak selesai` | RAM penuh. Kurangi jumlah `thread` dan pastikan RAM longgar minimal ±300 MB per-thread. |
 
 ---
 
 ## 📄 Lisensi
-
-MIT License — Lihat file [LICENSE](LICENSE) untuk detail.
-
----
-
-## 🔗 Kredit & Referensi
-
-- 🧑‍💻 **Owner Asli**: [SGAHSCAJASCJ](https://github.com/SGAHSCAJASCJ/Turnstile-Solver) — Fondasi solver ini
-- 🦊 [Camoufox](https://github.com/daijro/camoufox) — Browser anti-deteksi berbasis Firefox
-- ⚡ [FastAPI](https://fastapi.tiangolo.com/) — Framework API modern
-- ☁️ [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) — Dokumentasi resmi Turnstile
-
----
+MIT License — Lihat [LICENSE](LICENSE).
 
 <div align="center">
-
-**⚡ Performa Tinggi &nbsp;|&nbsp; 🚀 3 Endpoint Solver &nbsp;|&nbsp; 🛡️ Stabil & Andal &nbsp;|&nbsp; 🌐 Proxy Ready &nbsp;|&nbsp; 🖥️ VPS Auto Setup**
-
+<b>⚡ Performa Tinggi &nbsp;|&nbsp; 🚀 Multi Solver &nbsp;|&nbsp; 🛡️ Camoufox Powered</b>
 </div>
