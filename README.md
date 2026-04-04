@@ -26,7 +26,11 @@ Langkah-langkah yang **paling disarankan** di VPS Linux (Ubuntu/Debian) baru:
 ```bash
 # 1. Update system & Install system dependencies browser
 sudo apt update -y && sudo apt upgrade -y
-sudo apt install -y xvfb libasound2 python3 python3-pip python3.12-venv 
+sudo apt install xvfb -y
+sudo apt install libasound2 -y
+sudo apt install python3.12 -y
+sudo apt install python3-pip -y
+sudo apt install python3.12-venv -y
 
 # 2. Buat & Aktifkan virtual environment (sangat disarankan)
 python3 -m venv venv
