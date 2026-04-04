@@ -491,33 +491,140 @@ class ClearanceAPIServer:
     #  AWS WAF TOKEN SOLVER
     # ──────────────────────────────────────────────
 
+    # ── Judul/pesan yang dikeluarkan CloudFront saat IP di-block ──
+    _CLOUDFRONT_BLOCK_TITLES = [
+        "error: the request could not be satisfied",
+        "403 forbidden",
+        "access denied",
+        "request blocked",
+    ]
+
+    def _is_cloudfront_blocked(self, title: str) -> bool:
+        t = title.lower().strip()
+        return any(kw in t for kw in self._CLOUDFRONT_BLOCK_TITLES)
+
     async def _solve_aws_token(self, task_id: str, url: str, timeout: int = 30):
         """
         Navigasi browser ke URL target, tunggu aws-waf-token cookie muncul,
         lalu return cookies + user-agent.
+        Jika IP diblok CloudFront, otomatis retry dengan proxy (jika tersedia).
         """
         start_time = time.time()
         page, context = await self.page_pool.get()
-        try:
-            logger.info(f"[AWS-Token] Navigasi ke {url} — {task_id}")
-            await page.goto(url, wait_until="domcontentloaded", timeout=timeout * 1000)
+        _temp_context = None  # context sementara untuk retry proxy
 
-            # Tunggu aws-waf-token cookie muncul
-            deadline = time.time() + timeout
+        async def _navigate_and_poll(p, ctx, attempt_label: str):
+            """Navigasi, poll cookies, kembalikan (waf_cookie, title, final_url, status, poll_count)."""
+            response_status = None
+            final_url = url
+            try:
+                remaining_timeout = max(5, int(timeout - (time.time() - start_time))) * 1000
+                resp = await p.goto(url, wait_until="domcontentloaded", timeout=remaining_timeout)
+                response_status = resp.status if resp else None
+                final_url = p.url
+                logger.debug(f"[AWS-Token][{attempt_label}] HTTP {response_status} | URL: {final_url}")
+            except Exception as nav_err:
+                logger.debug(f"[AWS-Token][{attempt_label}] goto() error: {nav_err}")
+
+            try:
+                title_now = await p.title()
+                logger.debug(f"[AWS-Token][{attempt_label}] Judul: '{title_now}'")
+                if self._is_cloudfront_blocked(title_now):
+                    logger.warning(f"[AWS-Token][{attempt_label}] 🚫 CLOUDFRONT BLOCK TERDETEKSI: '{title_now}'")
+                    return None, title_now, final_url, response_status, 0, True
+            except Exception:
+                title_now = ""
+
+            # Poll
+            deadline_poll = time.time() + max(1, timeout - (time.time() - start_time))
             waf_cookie = None
-            while time.time() < deadline:
-                cookies = await context.cookies()
+            poll_count = 0
+            while time.time() < deadline_poll:
+                poll_count += 1
+                cookies = await ctx.cookies()
+                cookie_names = [c["name"] for c in cookies]
+                logger.debug(f"[AWS-Token][{attempt_label}] Poll #{poll_count} | Cookies: {cookie_names}")
+
                 waf_cookie = next((c for c in cookies if c["name"] == "aws-waf-token"), None)
                 if waf_cookie:
+                    logger.debug(f"[AWS-Token][{attempt_label}] ✅ aws-waf-token ditemukan di poll #{poll_count}")
                     break
+
+                # Cek judul tiap 5 detik (bisa jadi halaman di-redirect ke block page)
+                if poll_count % 5 == 0:
+                    try:
+                        cur_title = await p.title()
+                        cur_url = p.url
+                        logger.debug(f"[AWS-Token][{attempt_label}] [5s] Judul: '{cur_title}' | URL: {cur_url}")
+                        if self._is_cloudfront_blocked(cur_title):
+                            logger.warning(f"[AWS-Token][{attempt_label}] 🚫 Block terdeteksi saat polling: '{cur_title}'")
+                            return None, cur_title, cur_url, response_status, poll_count, True
+                    except Exception:
+                        pass
+
                 await asyncio.sleep(1)
+
+            try:
+                final_title = await p.title()
+            except Exception:
+                final_title = title_now
+
+            return waf_cookie, final_title, final_url, response_status, poll_count, False
+
+        try:
+            logger.info(f"[AWS-Token] Navigasi ke {url} — {task_id}")
+            logger.debug(f"[AWS-Token] Timeout: {timeout}s | proxy_support: {self.proxy_support} | proxies: {len(self.proxies)}")
+
+            # ── Attempt 1: tanpa proxy (dari pool) ──
+            waf_cookie, title, final_url, http_status, polls, was_blocked = await _navigate_and_poll(page, context, "no-proxy")
+
+            # ── Jika diblok CloudFront, coba ulang dengan proxy ──
+            if was_blocked or (not waf_cookie):
+                if was_blocked:
+                    logger.warning(f"[AWS-Token] IP VPS diblok CloudFront. Mencoba proxy... ({len(self.proxies)} tersedia)")
+
+                if self.proxies:
+                    proxy_str = self._next_proxy()
+                    logger.info(f"[AWS-Token] Retry dengan proxy: {proxy_str}")
+                    try:
+                        _temp_context = await self._create_context_with_proxy(proxy_str)
+                        proxy_page = await _temp_context.new_page()
+                        try:
+                            w2, t2, u2, s2, p2, b2 = await _navigate_and_poll(proxy_page, _temp_context, f"proxy:{proxy_str}")
+                            if w2:
+                                waf_cookie, title, final_url, http_status, polls = w2, t2, u2, s2, p2
+                                logger.info(f"[AWS-Token] ✅ Proxy berhasil bypass CloudFront block")
+                            else:
+                                logger.warning(f"[AWS-Token] Proxy juga gagal. Judul: '{t2}' | blocked: {b2}")
+                        finally:
+                            try:
+                                await proxy_page.close()
+                            except Exception:
+                                pass
+                    except Exception as proxy_err:
+                        logger.error(f"[AWS-Token] Gagal buat context proxy: {proxy_err}")
+                        logger.debug(f"[AWS-Token] Proxy error detail: {type(proxy_err).__name__}: {proxy_err}")
+                else:
+                    if was_blocked:
+                        logger.error(
+                            "[AWS-Token] 🚫 IP VPS diblok CloudFront dan tidak ada proxy tersedia!\n"
+                            "         → Aktifkan proxy_support=true di config.json dan isi proxies.txt"
+                        )
 
             elapsed = round(time.time() - start_time, 3)
 
             if waf_cookie:
-                all_cookies = await context.cookies()
+                # Ambil cookies dari context yang sukses
+                try:
+                    all_cookies = await context.cookies() if not _temp_context else await _temp_context.cookies()
+                except Exception:
+                    all_cookies = []
                 cookie_header = "; ".join(f"{c['name']}={c['value']}" for c in all_cookies)
-                user_agent = await page.evaluate("navigator.userAgent")
+                try:
+                    user_agent = await page.evaluate("navigator.userAgent")
+                except Exception:
+                    user_agent = "unknown"
+                logger.debug(f"[AWS-Token] User-Agent: {user_agent}")
                 self.results[task_id] = {
                     "status": "success",
                     "elapsed_time": elapsed,
@@ -527,20 +634,64 @@ class ClearanceAPIServer:
                 }
                 logger.success(f"[AWS-Token] Sukses — {task_id} ({elapsed}s)")
             else:
-                title = await page.title()
-                self.results[task_id] = {
-                    "status": "error",
-                    "elapsed_time": elapsed,
-                    "value": "waf_fail",
-                    "message": f"aws-waf-token tidak ditemukan setelah {timeout}s. Judul: '{title}'",
-                }
-                logger.warning(f"[AWS-Token] Gagal — {task_id}")
+                # ── Diagnosis lengkap saat gagal ──
+                try:
+                    fail_title = title
+                    fail_url = final_url
+                    cookie_dump = {}
+                    try:
+                        remaining_cookies = await context.cookies()
+                        cookie_dump = {c["name"]: c["value"][:40] for c in remaining_cookies}
+                    except Exception:
+                        pass
+
+                    logger.warning(f"[AWS-Token] Gagal — {task_id} | Judul: '{fail_title}' | URL: {fail_url}")
+                    logger.debug(f"[AWS-Token] Total polls: {polls} | elapsed: {elapsed}s | HTTP: {http_status}")
+                    logger.debug(f"[AWS-Token] Cookies saat gagal: {cookie_dump}")
+
+                    # Screenshot
+                    try:
+                        debug_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "debug_logs")
+                        os.makedirs(debug_dir, exist_ok=True)
+                        ts = time.strftime("%Y%m%d_%H%M%S")
+                        shot_path = os.path.join(debug_dir, f"{ts}_{task_id[:8]}_aws_fail.png")
+                        await page.screenshot(path=shot_path, full_page=True)
+                        logger.debug(f"[AWS-Token] Screenshot: {shot_path}")
+                    except Exception as ss_err:
+                        logger.debug(f"[AWS-Token] Gagal screenshot: {ss_err}")
+
+                    block_note = " (IP diblok CloudFront — gunakan proxy!)" if was_blocked else ""
+                    self.results[task_id] = {
+                        "status": "error",
+                        "elapsed_time": elapsed,
+                        "value": "waf_fail",
+                        "message": (
+                            f"aws-waf-token tidak ditemukan setelah {elapsed}s "
+                            f"({polls} polls). HTTP {http_status}. "
+                            f"Judul: '{fail_title}'{block_note}"
+                        ),
+                    }
+                except Exception as diag_err:
+                    logger.debug(f"[AWS-Token] Gagal diagnosis: {diag_err}")
+                    self.results[task_id] = {
+                        "status": "error",
+                        "elapsed_time": elapsed,
+                        "value": "waf_fail",
+                        "message": f"aws-waf-token tidak ditemukan setelah {timeout}s",
+                    }
 
         except Exception as e:
             elapsed = round(time.time() - start_time, 3)
             self.results[task_id] = {"status": "error", "elapsed_time": elapsed, "value": str(e)}
             logger.error(f"[AWS-Token] Exception — {task_id}: {e}")
+            logger.debug(f"[AWS-Token] {type(e).__name__}: {e}")
         finally:
+            # Tutup context proxy sementara jika ada
+            if _temp_context is not None:
+                try:
+                    await _temp_context.close()
+                except Exception:
+                    pass
             try:
                 await context.clear_cookies()
             except Exception:
@@ -553,6 +704,7 @@ class ClearanceAPIServer:
                 await self.page_pool.put((page, context))
             else:
                 logger.info(f"[AWS-Token] Page dibuang (context sudah di-restart) — {task_id}")
+
 
     # ──────────────────────────────────────────────
     #  ENDPOINTS
@@ -687,109 +839,7 @@ def _print_banner():
     print()
 
 
-# ──────────────────────────────────────────────
-#  VPS AUTO SETUP (Linux only)
-# ──────────────────────────────────────────────
-def _vps_setup():
-    """Setup otomatis untuk VPS Linux baru. Skip di Windows."""
-    if sys.platform == "win32":
-        return
 
-    import subprocess, shutil
-
-    print("\n" + "═" * 52)
-    print("  🖥️   CEK ENVIRONMENT VPS")
-    print("═" * 52)
-
-    # 1. Tampilkan versi Python
-    py_ver = sys.version.split()[0]
-    py_major, py_minor = sys.version_info[:2]
-    if py_major >= 3 and py_minor >= 10:
-        print(f"  ✅  Python {py_ver} (>= 3.10)")
-    else:
-        print(f"  ⚠️  Python {py_ver} terdeteksi. Disarankan >= 3.10")
-
-    # 2. Cek pip
-    try:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "--version"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        print("  ✅  pip sudah terpasang")
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("  📦  pip belum ada, menginstall via ensurepip...")
-        try:
-            subprocess.check_call(
-                [sys.executable, "-m", "ensurepip", "--upgrade"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-            print("  ✅  pip berhasil diinstall")
-        except Exception:
-            print("  ⚠️  Gagal install pip. Jalankan manual: sudo apt install python3-pip -y")
-
-    # 3. Cek python3-venv
-    try:
-        import venv
-        print("  ✅  python3-venv sudah terpasang")
-    except ImportError:
-        print("  📦  python3-venv belum ada, menginstall...")
-        try:
-            subprocess.check_call(
-                ["apt-get", "install", "-y", f"python3-venv", "python3.{py_minor}-venv"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-            print("  ✅  python3-venv berhasil diinstall")
-        except Exception:
-            print("  ⚠️  Gagal install python3-venv. Jalankan manual: sudo apt install python3-venv -y")
-
-    # 4. Cek apakah jalan di venv
-    in_venv = (hasattr(sys, 'real_prefix') or
-               (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
-    if in_venv:
-        print(f"  ✅  Virtual environment aktif: {sys.prefix}")
-    else:
-        print("  ⚠️  Tidak dalam virtual environment")
-        print("       Disarankan: python3 -m venv venv && source venv/bin/activate")
-
-    # 5. Playwright/Camoufox browser deps (Linux)
-    if shutil.which("apt-get"):
-        print("  📦  Menginstall browser dependencies (playwright install-deps)...")
-        try:
-            subprocess.check_call(
-                [sys.executable, "-m", "playwright", "install-deps"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-            print("  ✅  Browser dependencies terpasang")
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            # Playwright mungkin belum terinstall, akan diinstall oleh _auto_install nanti
-            # Coba install system deps langsung
-            try:
-                subprocess.check_call(
-                    ["apt-get", "install", "-y",
-                     "libatk-bridge2.0-0", "libcups2", "libdrm2", "libgbm1",
-                     "libgtk-3-0", "libnspr4", "libnss3", "libxcomposite1",
-                     "libxdamage1", "libxrandr2", "xvfb",
-                     "fonts-liberation", "libappindicator3-1", "libasound2"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
-                print("  ✅  Browser dependencies terpasang (via apt)")
-            except Exception:
-                print("  ⚠️  Gagal install browser deps. Jalankan manual setelah install:")
-                print("       python3 -m playwright install-deps")
-
-    # 6. apt update (background check)
-    if shutil.which("apt-get") and os.geteuid() == 0:
-        print("  🔄  Menjalankan apt update...")
-        try:
-            subprocess.check_call(
-                ["apt-get", "update", "-y"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-            print("  ✅  apt update selesai")
-        except Exception:
-            print("  ⚠️  apt update gagal, lanjut saja")
-
-    print("═" * 52 + "\n")
 
 
 # ──────────────────────────────────────────────
@@ -797,7 +847,7 @@ def _vps_setup():
 # ──────────────────────────────────────────────
 def _auto_install():
     import subprocess
-    PACKAGES = ["fastapi==0.95.2", "uvicorn", "camoufox", "loguru", "psutil"]
+    PACKAGES = ["fastapi==0.95.2", "uvicorn", "camoufox[fetch]", "loguru", "psutil"]
     print("\n" + "═" * 52)
     print("  🔧  Memeriksa dependensi yang dibutuhkan...")
     print("═" * 52)
@@ -822,7 +872,7 @@ def _auto_install():
             print(f"  {'✅' if installed else '⚠️ Gagal install'}  {pkg}")
 
     import shutil
-    if not shutil.which("camoufox") and not _camoufox_data_exists():
+    if not _camoufox_data_exists():
         print("  🌐  Mengunduh data browser Camoufox...")
         subprocess.check_call([sys.executable, "-m", "camoufox", "fetch"])
         print("  ✅  Camoufox berhasil diunduh")
@@ -830,8 +880,9 @@ def _auto_install():
 
 
 def _camoufox_data_exists():
-    d = os.path.join(os.path.expanduser("~"), ".camoufox")
-    return os.path.isdir(d) and bool(os.listdir(d))
+    d1 = os.path.join(os.path.expanduser("~"), ".camoufox")
+    d2 = os.path.join(os.path.expanduser("~"), ".cache", "camoufox")
+    return (os.path.isdir(d1) and bool(os.listdir(d1))) or (os.path.isdir(d2) and bool(os.listdir(d2)))
 
 
 def _check_xvfb(headless: bool):
@@ -1026,7 +1077,6 @@ def _check_system(cfg: dict):
 # ──────────────────────────────────────────────
 if __name__ == "__main__":
     _print_banner()
-    _vps_setup()
     _auto_install()
     config = _load_config()
     config = _interactive_config(config)
