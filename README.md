@@ -1,5 +1,7 @@
 # Turnstile, cf_clearance, & AWS WAF Token Solver
 
+<img width="830" height="494" alt="Screenshot 2026-05-26 045641" src="https://github.com/user-attachments/assets/ee5e5f19-6dfc-4221-aba3-3daa9447df18" />
+
 > Terinspirasi dari : 
 [SGAHSCAJASCJ/Turnstile-Solver](https://github.com/SGAHSCAJASCJ/Turnstile-Solver) (Turnstile) - [verfired8975/recaptcha-v3-solver](https://github.com/verfired8975/recaptcha-v3-solver) (Recaptcha V3) 
 
