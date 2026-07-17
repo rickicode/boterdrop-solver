@@ -1,33 +1,39 @@
+<p align="center">
+  <a href="./README.md"><b>English</b></a> | <a href="./README.id.md">Bahasa Indonesia</a>
+</p>
+
 # Turnstile, cf_clearance, Recaptcha & AWS WAF Token Solver
 
 <img width="830" height="494" alt="Screenshot 2026-05-26 045641" src="https://github.com/user-attachments/assets/ee5e5f19-6dfc-4221-aba3-3daa9447df18" />
 
-> Terinspirasi dari : 
-[SGAHSCAJASCJ/Turnstile-Solver](https://github.com/SGAHSCAJASCJ/Turnstile-Solver) (Turnstile) - [verfired8975/recaptcha-v3-solver](https://github.com/verfired8975/recaptcha-v3-solver) (Recaptcha V3) 
+> ✅ **Status: Confirmed working.** This project is regularly tested and updated.
 
-Solusi pemecahan CAPTCHA Cloudflare Turnstile, cf_clearance, Recaptcha V3 & AWS WAF Token berkinerja tinggi yang dibangun dengan **FastAPI** dan teknologi browser asinkron (**Camoufox**), menyediakan layanan RESTful API yang siap dipakai.
+> Inspired by:
+[SGAHSCAJASCJ/Turnstile-Solver](https://github.com/SGAHSCAJASCJ/Turnstile-Solver) (Turnstile) — [verfired8975/recaptcha-v3-solver](https://github.com/verfired8975/recaptcha-v3-solver) (Recaptcha V3)
 
----
-
-## ✨ Fitur Utama
-
-- **4 Endpoint Solver**: `/turnstile`, `/clearance`, `/aws-token`, `/recaptchaV3`
-- **Auto Install & Fetch**: Dependensi Python dan Camoufox diinstall otomatis saat pertama kali jalan.
-- **Konfigurasi via `config.json`**: Semua setting dapat diatur dari file atau prompt interaktif.
-- **Proxy Rotation**: Dukungan proxy per-instance browser dengan rotasi round-robin.
-- **Forced Cleanup**: Cleanup memori berkala paksa untuk kestabilan server di VPS ber-RAM kecil.
-- **Mode Headless & GUI**: Kompatibel untuk dijalankan via Terminal/VPS (`xvfb`) maupun RDP.
+A high-performance solver for Cloudflare Turnstile CAPTCHA, cf_clearance, Recaptcha V3, and AWS WAF Tokens, built with **FastAPI** and asynchronous browser technology (**Camoufox**), providing a ready-to-use RESTful API service.
 
 ---
 
-## 🚀 Instalasi & Setup (Khusus VPS Baru)
+## ✨ Key Features
 
-**Catatan:** *Masalah instalasi berulang (`camoufox fetch` error atau browser dependensi) di VPS baru biasanya disebabkan karena cache data browser yang belum lengkap.* Script versi terbaru sudah memperbaiki deteksi versi camoufox otomatis.
+- **4 Solver Endpoints**: `/turnstile`, `/clearance`, `/aws-token`, `/recaptchaV3`
+- **Auto Install & Fetch**: Python dependencies and Camoufox are installed automatically on first run.
+- **Configuration via `config.json`**: All settings can be configured via file or interactive prompt.
+- **Proxy Rotation**: Per-browser-instance proxy support with round-robin rotation.
+- **Forced Cleanup**: Periodic forced memory cleanup for server stability on low-RAM VPS.
+- **Headless & GUI Mode**: Compatible for running via Terminal/VPS (`xvfb`) or RDP.
 
-Langkah-langkah yang **paling disarankan** di VPS Linux (Ubuntu/Debian) baru:
+---
+
+## 🚀 Installation & Setup (For New VPS)
+
+**Note:** *Repeated installation issues (`camoufox fetch` errors or browser dependency issues) on a new VPS are usually caused by incomplete browser cache data.* The latest script version has fixed automatic camoufox version detection.
+
+The **recommended steps** on a new Linux VPS (Ubuntu/Debian):
 
 ```bash
-# 1. Update system & Install system dependencies browser
+# 1. Update system & install browser system dependencies
 sudo apt update -y && sudo apt upgrade -y
 sudo apt install xvfb -y
 sudo apt install libasound2 -y
@@ -39,24 +45,24 @@ sudo apt install python3-venv -y
 git clone https://github.com/najibyahya/Turnstile-Solver
 cd Turnstile-Solver
 
-# 3. Buat & Aktifkan virtual environment (sangat disarankan)
+# 3. Create & activate virtual environment (highly recommended)
 python3 -m venv venv
 source venv/bin/activate
 
-# 4. Install dependensi Python dasar
+# 4. Install base Python dependencies
 pip install fastapi==0.95.2 uvicorn "camoufox[fetch]" loguru psutil playwright
 
-# 5. FETCH & INSTALL DEPENDENCY MANUAL (LAKUKAN SEKALI SAJA)
-# Ini mencegah masalah "Version information not found" & "browser dependencies"
+# 5. FETCH & INSTALL DEPENDENCIES MANUALLY (DO THIS ONCE)
+# This prevents "Version information not found" & "browser dependencies" issues
 python3 -m camoufox fetch
 python3 -m playwright install-deps
 playwright install
 
-# 6. Jalankan Server
+# 6. Run the server
 python3 api_server.py
 ```
 
-> **INFO:** Jika menggunakan mode headless (false):
+> **INFO:** If using headless mode (false):
 > ```bash
 > source venv/bin/activate
 > xvfb-run -a python3 api_server.py
@@ -64,9 +70,9 @@ python3 api_server.py
 
 ---
 
-## ⚙️ Konfigurasi (`config.json`)
+## ⚙️ Configuration (`config.json`)
 
-Ketika pertama kali dijalankan, script akan membuat `config.json`. Anda bisa mengubahnya langsung:
+On first run, the script will create a `config.json` file. You can edit it directly:
 
 ```json
 {
@@ -82,40 +88,40 @@ Ketika pertama kali dijalankan, script akan membuat `config.json`. Anda bisa men
 }
 ```
 
-| Parameter | Tipe | Default | Keterangan |
+| Parameter | Type | Default | Description |
 |---|---|---|---|
-| `headless` | bool | `true` | Browser berjalan tanpa tampilan GUI |
-| `thread` | int | `2` | Jumlah instance browser (disarankan max = jumlah core CPU) |
-| `page_count` | int | `1` | Jumlah tab/halaman per browser |
-| `proxy_support` | bool | `false` | Status penggunaan daftar proxy dari `proxies.txt` |
-| `cleanup_interval_minutes` | int | `10` | Jeda waktu sistem merefresh/membersihkan memori browser |
+| `headless` | bool | `true` | Browser runs without a GUI |
+| `thread` | int | `2` | Number of browser instances (recommended max = number of CPU cores) |
+| `page_count` | int | `1` | Number of tabs/pages per browser |
+| `proxy_support` | bool | `false` | Whether to use the proxy list from `proxies.txt` |
+| `cleanup_interval_minutes` | int | `10` | Interval for refreshing/cleaning up browser memory |
 
 ---
 
-## 🌐 Format Proxy (`proxies.txt`)
+## 🌐 Proxy Format (`proxies.txt`)
 
-Jika `proxy_support` dihidupkan, tambahkan proxy pada file `proxies.txt` (satu proxy tiap baris).
-Format yang didukung:
+If `proxy_support` is enabled, add proxies to `proxies.txt` (one proxy per line).
+Supported formats:
 ```text
 http://ip:port
 http://user:pass@ip:port
 socks5://user:pass@ip:port
 ```
 
-## 📖 Endpoint Dokumentasi API
+## 📖 API Endpoint Documentation
 
-Solver ini bekerja dengan cara asynchronous (membuat antrean tugas). Masing-masing endpoint memblokir proses sampai token sukses diambil atau dikembalikan dalam status gagal.
+This solver works asynchronously (creating a task queue). Each endpoint blocks until a token is successfully retrieved or returned with a failed status.
 
-### 1. Endpoint Task Pembuatan
+### 1. Task Creation Endpoints
 
-| Task | Endpoint | Parameter yang dibutuhkan |
+| Task | Endpoint | Required Parameters |
 |---|---|---|
 | Turnstile | `GET /turnstile` | `url` (Target URL), `sitekey` (Turnstile Key) |
-| cf_clearance | `GET /clearance` | `url` (Target URL), `timeout` (opsional batas detik) |
-| AWS WAF | `GET /aws-token` | `url` (Target URL), `timeout` (opsional batas detik) |
-| reCAPTCHA v3 | `GET atau POST` ke `/recaptchaV3` | `url` / `domain` (Target URL), `sitekey` / `siteKey` (reCAPTCHA Key), `action` (opsional, default: `submit`) |
+| cf_clearance | `GET /clearance` | `url` (Target URL), `timeout` (optional, seconds) |
+| AWS WAF | `GET /aws-token` | `url` (Target URL), `timeout` (optional, seconds) |
+| reCAPTCHA v3 | `GET or POST` to `/recaptchaV3` | `url` / `domain` (Target URL), `sitekey` / `siteKey` (reCAPTCHA Key), `action` (optional, default: `submit`) |
 
-#### 🌐 Contoh Request HTTP (cURL) Pembuatan Task
+#### 🌐 Example HTTP Requests (cURL) for Task Creation
 
 ##### A. Cloudflare Turnstile (`GET /turnstile`)
 ```bash
@@ -132,19 +138,19 @@ curl -X GET "http://127.0.0.1:8001/clearance?url=https://target.cc/&timeout=30"
 curl -X GET "http://127.0.0.1:8001/aws-token?url=https://target.cc/waitlist&timeout=30"
 ```
 
-##### D. Google reCAPTCHA v3 (`GET` atau `POST` ke `/recaptchaV3`)
-* **Menggunakan HTTP GET:**
+##### D. Google reCAPTCHA v3 (`GET` or `POST` to `/recaptchaV3`)
+* **Using HTTP GET:**
 ```bash
 curl -X GET "http://127.0.0.1:8001/recaptchaV3?url=https://target.cc&sitekey=6Ldqxxxxxxxxxxxxxx19Tpa1XsSZfIW&action=submit"
 ```
-* **Menggunakan HTTP POST (JSON Body):**
+* **Using HTTP POST (JSON Body):**
 ```bash
 curl -X POST "http://127.0.0.1:8001/recaptchaV3" \
      -H "Content-Type: application/json" \
      -d '{"url": "https://target.cc", "sitekey": "6Ldqxxxxxxxxxxxxxx19Tpa1XsSZfIW", "action": "submit"}'
 ```
 
-**Contoh Response Sukses Pembuatan Task (202 Accepted):**
+**Example Successful Task Creation Response (202 Accepted):**
 ```json
 {
   "task_id": "8a31e3d4-b41e-450f-a63c-94cc8193eb41",
@@ -154,16 +160,16 @@ curl -X POST "http://127.0.0.1:8001/recaptchaV3" \
 
 ---
 
-### 2. Endpoint Polling Hasil (`GET /result?id=<task_id>`)
+### 2. Result Polling Endpoint (`GET /result?id=<task_id>`)
 
-Anda wajib melakukan **polling request** ke endpoint ini tiap (minimal) 1 detik menggunakan `task_id` dari pembuatan task di atas sampai `status` bernilai `success` atau `error`.
+You must **poll** this endpoint at least every 1 second using the `task_id` from the task creation above, until `status` is either `success` or `error`.
 
-**Contoh Request Polling (cURL):**
+**Example Polling Request (cURL):**
 ```bash
 curl -X GET "http://127.0.0.1:8001/result?id=8a31e3d4-b41e-450f-a63c-94cc8193eb41"
 ```
 
-**Contoh Response Sukses dari Turnstile / reCAPTCHA v3:**
+**Example Successful Response from Turnstile / reCAPTCHA v3:**
 ```json
 {
   "status": "success",
@@ -172,7 +178,7 @@ curl -X GET "http://127.0.0.1:8001/result?id=8a31e3d4-b41e-450f-a63c-94cc8193eb4
 }
 ```
 
-**Contoh Response Sukses dari cf_clearance / AWS WAF:**
+**Example Successful Response from cf_clearance / AWS WAF:**
 ```json
 {
   "status": "success",
@@ -183,18 +189,18 @@ curl -X GET "http://127.0.0.1:8001/result?id=8a31e3d4-b41e-450f-a63c-94cc8193eb4
 }
 ```
 
-**Kode Status HTTP:**
-- `200` = Sukses.
-- `202` = Sedang diproses, terus lakukan request GET /result.
-- `404` = Task ID kadaluarsa atau tidak ditemukan.
-- `408` = Time Out (> 5 Menit memutar).
-- `500`/`422` = Eror di internal atau Captcha gagal disolve.
+**HTTP Status Codes:**
+- `200` = Success.
+- `202` = Still processing, keep polling `GET /result`.
+- `404` = Task ID expired or not found.
+- `408` = Timeout (> 5 minutes elapsed).
+- `500`/`422` = Internal error or CAPTCHA solving failed.
 
 ---
 
-## 📄 Lisensi
-MIT License — Lihat [LICENSE](LICENSE).
+## 📄 License
+MIT License — See [LICENSE](LICENSE).
 
 <div align="center">
-<b>⚡ Performa Tinggi &nbsp;|&nbsp; 🚀 Multi Solver</b>
+<b>⚡ High Performance &nbsp;|&nbsp; 🚀 Multi Solver</b>
 </div>
