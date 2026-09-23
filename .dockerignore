@@ -1,0 +1,7 @@
+.git
+venv
+__pycache__
+debug_logs
+*.log
+*.png
+mcp_venv

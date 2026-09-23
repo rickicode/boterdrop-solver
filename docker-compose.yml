@@ -1,0 +1,14 @@
+# Build context: /workspaces/Boterdrop-Solver
+# RAM limit: 4 GB hard cap + 1 GB swap. Naikkan bila pool thread ditambah.
+services:
+  boterdrop:
+    build: .
+    image: boterdrop-solver:local
+    container_name: boterdrop-solver
+    restart: unless-stopped
+    ports:
+      - "20011:8002"
+    mem_limit: 4g
+    memswap_limit: 5g
+    shm_size: 1g
+    cpus: "4.0"
