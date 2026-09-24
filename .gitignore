@@ -1,0 +1,15 @@
+# Runtime artifacts / local env — never commit
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+debug_logs/
+*.log
+.env
+.env.*
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store

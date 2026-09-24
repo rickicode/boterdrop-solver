@@ -26,7 +26,35 @@ A high-performance solver for Cloudflare Turnstile CAPTCHA, cf_clearance, Recapt
 
 ---
 
-## 🚀 Installation & Setup (For New VPS)
+## 🐳 Quick Install (Docker — Recommended)
+
+Pull the pre-built image from GHCR (auto-published by CI on every push to `main`):
+
+```bash
+# Run solver (port 20011, RAM capped at 3 GB)
+docker run -d --name boterdrop-solver \
+  --restart unless-stopped \
+  -p 20011:8002 \
+  --memory=3g --memory-swap=4g --cpus=4 --shm-size=1g \
+  ghcr.io/rickicode/boterdrop-solver:latest
+```
+
+Or build from source with compose:
+
+```bash
+git clone https://github.com/rickicode/boterdrop-solver
+cd boterdrop-solver
+docker compose up -d --build
+```
+
+Health check: `curl -s http://127.0.0.1:20011/openapi.json | head -c 120`
+
+CI workflow (`.github/workflows/docker-publish.yml`) builds the image and pushes
+`ghcr.io/rickicode/boterdrop-solver:latest` + commit-SHA tags on every push.
+
+---
+
+## 🚀 Installation & Setup (Manual, For New VPS)
 
 **Note:** *Repeated installation issues (`camoufox fetch` errors or browser dependency issues) on a new VPS are usually caused by incomplete browser cache data.* The latest script version has fixed automatic camoufox version detection.
 
@@ -42,8 +70,8 @@ sudo apt install python3-pip -y
 sudo apt install python3-venv -y
 
 # 2. Clone Repository
-git clone https://github.com/najibyahya/Turnstile-Solver
-cd Turnstile-Solver
+git clone https://github.com/rickicode/boterdrop-solver
+cd boterdrop-solver
 
 # 3. Create & activate virtual environment (highly recommended)
 python3 -m venv venv

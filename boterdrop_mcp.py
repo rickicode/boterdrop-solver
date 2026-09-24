@@ -15,7 +15,33 @@ from typing import Any, Dict, Optional
 import httpx
 from mcp.server.fastmcp import FastMCP
 
-GATEWAY_URL = os.environ.get("BOTERDROP_GATEWAY_URL", "http://127.0.0.1:8000").rstrip("/")
+def get_boterdrop_gateway() -> str:
+    """Auto-detect active Boterdrop solver endpoint.
+    
+    Priority:
+    1. BOTERDROP_GATEWAY_URL / BOTERDROP_URL env if provided
+    2. Laptop Boterdrop (http://laptop-host.example.com:20011) - UTAMA
+    3. Local Docker Boterdrop (http://127.0.0.1:20011) - CADANGAN
+    """
+    env = os.environ.get("BOTERDROP_GATEWAY_URL") or os.environ.get("BOTERDROP_URL")
+    if env:
+        return env.rstrip("/")
+
+    candidates = [
+        "http://laptop-host.example.com:20011",
+        "http://127.0.0.1:20011",
+    ]
+    for url in candidates:
+        try:
+            r = httpx.get(f"{url}/openapi.json", timeout=1.0)
+            if r.status_code == 200:
+                return url
+        except Exception:
+            continue
+    return "http://laptop-host.example.com:20011"
+
+
+GATEWAY_URL = get_boterdrop_gateway()
 
 mcp = FastMCP(
     "boterdrop",
@@ -28,7 +54,7 @@ async def _poll_result(client: httpx.AsyncClient, task_id: str, timeout: float =
     while time.time() < deadline:
         await asyncio.sleep(2.0)
         try:
-            r = await client.get(f"{GATEWAY_URL}/result", params={"id": task_id}, timeout=10.0)
+            r = await client.get(f"{get_boterdrop_gateway()}/result", params={"id": task_id}, timeout=10.0)
             if r.status_code == 200:
                 data = r.json()
                 if data.get("status") in ("success", "error"):
@@ -42,11 +68,14 @@ async def _poll_result(client: httpx.AsyncClient, task_id: str, timeout: float =
 async def get_solver_pool_status() -> Dict[str, Any]:
     """Check the health status and current load of the Boterdrop solver pool nodes."""
     async with httpx.AsyncClient(timeout=10.0) as client:
+        gw = get_boterdrop_gateway()
         try:
-            r = await client.get(f"{GATEWAY_URL}/health")
-            return r.json()
+            r = await client.get(f"{gw}/openapi.json")
+            if r.status_code == 200:
+                return {"status": "ok", "active_endpoint": gw}
+            return {"status": "degraded", "active_endpoint": gw, "code": r.status_code}
         except Exception as e:
-            return {"status": "error", "message": f"Failed to contact pool gateway: {e}"}
+            return {"status": "error", "message": f"Failed to contact endpoint {gw}: {e}"}
 
 
 @mcp.tool()
@@ -65,12 +94,13 @@ async def solve_turnstile(url: str, sitekey: str, action: Optional[str] = None) 
     if action:
         params["action"] = action
 
+    gw = get_boterdrop_gateway()
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Submit task with retry
         task_id = None
         for attempt in range(5):
             try:
-                r = await client.get(f"{GATEWAY_URL}/turnstile", params=params)
+                r = await client.get(f"{gw}/turnstile", params=params)
                 if r.status_code == 202:
                     data = r.json()
                     task_id = data.get("task_id")
@@ -82,7 +112,7 @@ async def solve_turnstile(url: str, sitekey: str, action: Optional[str] = None) 
                 await asyncio.sleep(2.0)
 
         if not task_id:
-            return {"status": "error", "message": "Failed to submit Turnstile task to solver pool"}
+            return {"status": "error", "message": f"Failed to submit Turnstile task to {gw}"}
 
         try:
             res = await _poll_result(client, task_id, timeout=90.0)
@@ -92,14 +122,16 @@ async def solve_turnstile(url: str, sitekey: str, action: Optional[str] = None) 
                     "token": res.get("value"),
                     "elapsed_time": res.get("elapsed_time"),
                     "task_id": task_id,
+                    "solver_endpoint": gw,
                 }
             return {
                 "status": "error",
                 "message": res.get("value", "Solve failed"),
                 "task_id": task_id,
+                "solver_endpoint": gw,
             }
         except TimeoutError as e:
-            return {"status": "timeout", "message": str(e), "task_id": task_id}
+            return {"status": "timeout", "message": str(e), "task_id": task_id, "solver_endpoint": gw}
 
 
 @mcp.tool()
@@ -113,9 +145,10 @@ async def solve_cloudflare_clearance(url: str, timeout: int = 30) -> Dict[str, A
     Returns:
         Dict with cf_clearance cookie, cookies header string, and matching user_agent.
     """
+    gw = get_boterdrop_gateway()
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            r = await client.get(f"{GATEWAY_URL}/clearance", params={"url": url, "timeout": timeout})
+            r = await client.get(f"{gw}/clearance", params={"url": url, "timeout": timeout})
             if r.status_code != 202:
                 return {"status": "error", "message": f"Clearance submit returned HTTP {r.status_code}: {r.text[:200]}"}
             task_id = r.json().get("task_id")
@@ -128,8 +161,9 @@ async def solve_cloudflare_clearance(url: str, timeout: int = 30) -> Dict[str, A
                     "user_agent": val.get("user_agent"),
                     "cookies": val.get("cookies"),
                     "elapsed_time": res.get("elapsed_time"),
+                    "solver_endpoint": gw,
                 }
-            return {"status": "error", "message": res.get("value", "Clearance failed")}
+            return {"status": "error", "message": res.get("value", "Clearance failed"), "solver_endpoint": gw}
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
@@ -145,9 +179,10 @@ async def solve_aws_waf_token(url: str, timeout: int = 30) -> Dict[str, Any]:
     Returns:
         Dict with token and matching user_agent.
     """
+    gw = get_boterdrop_gateway()
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            r = await client.get(f"{GATEWAY_URL}/aws-token", params={"url": url, "timeout": timeout})
+            r = await client.get(f"{gw}/aws-token", params={"url": url, "timeout": timeout})
             if r.status_code != 202:
                 return {"status": "error", "message": f"AWS token submit returned HTTP {r.status_code}: {r.text[:200]}"}
             task_id = r.json().get("task_id")
@@ -157,8 +192,9 @@ async def solve_aws_waf_token(url: str, timeout: int = 30) -> Dict[str, Any]:
                     "status": "success",
                     "token": res.get("value"),
                     "elapsed_time": res.get("elapsed_time"),
+                    "solver_endpoint": gw,
                 }
-            return {"status": "error", "message": res.get("value", "AWS token solve failed")}
+            return {"status": "error", "message": res.get("value", "AWS token solve failed"), "solver_endpoint": gw}
         except Exception as e:
             return {"status": "error", "message": str(e)}
 

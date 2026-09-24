@@ -1,11 +1,11 @@
 {
     "headless": true,
-    "thread": 5,
+    "thread": 4,
     "page_count": 2,
     "proxy_support": false,
     "proxy_file": "proxies.txt",
     "host": "0.0.0.0",
-    "port": 8000,
-    "debug": false
-
+    "port": 8002,
+    "debug": false,
+    "cleanup_interval_minutes": 10
 }
