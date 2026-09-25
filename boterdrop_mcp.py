@@ -20,7 +20,7 @@ def get_boterdrop_gateway() -> str:
     
     Priority:
     1. BOTERDROP_GATEWAY_URL / BOTERDROP_URL env if provided
-    2. Laptop Boterdrop (http://laptop-host.example.com:20011) - UTAMA
+    2. Pool Gateway (http://127.0.0.1:20012) - UTAMA (auto-failover 3 node)
     3. Local Docker Boterdrop (http://127.0.0.1:20011) - CADANGAN
     """
     env = os.environ.get("BOTERDROP_GATEWAY_URL") or os.environ.get("BOTERDROP_URL")
@@ -28,6 +28,7 @@ def get_boterdrop_gateway() -> str:
         return env.rstrip("/")
 
     candidates = [
+        "http://127.0.0.1:20012",   # pool gateway: auto failover
         "http://laptop-host.example.com:20011",
         "http://127.0.0.1:20011",
     ]
@@ -38,7 +39,7 @@ def get_boterdrop_gateway() -> str:
                 return url
         except Exception:
             continue
-    return "http://laptop-host.example.com:20011"
+    return "http://127.0.0.1:20012"
 
 
 GATEWAY_URL = get_boterdrop_gateway()

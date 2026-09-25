@@ -6,14 +6,14 @@ Usage:
     python3 solve.py --health
     python3 solve.py --serve          # show server status
 
-Server: http://127.0.0.1:20011  (Docker container: boterdrop-solver)
+Server: http://127.0.0.1:20012  (pool gateway: auto-failover 3 node)
 """
 import sys
 import time
 
 import requests
 
-SOLVER = "http://127.0.0.1:20011"
+SOLVER = "http://127.0.0.1:20012"  # pool gateway
 
 
 def health() -> int:

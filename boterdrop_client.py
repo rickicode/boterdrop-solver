@@ -39,8 +39,10 @@ import urllib.parse
 import urllib.request
 
 NODE_CANDIDATES = [
-    ("laptop", "http://laptop-host.example.com:20011"),
-    ("local_docker", "http://127.0.0.1:20011"),
+    ("gateway", "http://127.0.0.1:20012"),     # pool gateway: auto failover 3 node (utama)
+    ("laptop", "http://laptop-host.example.com:20011"),   # direct fallback
+    ("local_docker", "http://127.0.0.1:20011"),# direct fallback
+    ("cloud", "http://node-cloud.example.com:11473"),  # cloud fallback
 ]
 HEALTH_TTL = 20.0        # detik sebelum health di-check ulang
 HEALTH_TIMEOUT = 1.5
@@ -66,7 +68,7 @@ def get_default_boterdrop_base() -> str:
     for name, base in nodes:
         if _probe(base):
             return base
-    return "http://127.0.0.1:20011"
+    return "http://127.0.0.1:20012"
 
 
 def _probe(base: str) -> bool:
@@ -108,7 +110,7 @@ class BoterdropPool:
         """Round-robin antar node sehat; kalau semua tidak sehat pakai lokal."""
         healthy = self.healthy_nodes()
         if not healthy:
-            return "http://127.0.0.1:20011"
+            return "http://127.0.0.1:20012"
         for _ in range(len(self.nodes)):
             base = next(self._rr)
             if base in healthy:
