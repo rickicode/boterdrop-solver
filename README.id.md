@@ -125,27 +125,27 @@ Solver ini bekerja dengan cara asynchronous (membuat antrean tugas). Masing-masi
 
 ##### A. Cloudflare Turnstile (`GET /turnstile`)
 ```bash
-curl -X GET "http://127.0.0.1:8001/turnstile?url=https://target.cc/&sitekey=0x4AAAAAxxxxxxxxETLYn"
+curl -X GET "http://127.0.0.1:20012/turnstile?url=https://target.cc/&sitekey=0x4AAAAAxxxxxxxxETLYn"
 ```
 
 ##### B. Cloudflare cf_clearance (`GET /clearance`)
 ```bash
-curl -X GET "http://127.0.0.1:8001/clearance?url=https://target.cc/&timeout=30"
+curl -X GET "http://127.0.0.1:20012/clearance?url=https://target.cc/&timeout=30"
 ```
 
 ##### C. AWS WAF Token (`GET /aws-token`)
 ```bash
-curl -X GET "http://127.0.0.1:8001/aws-token?url=https://target.cc/waitlist&timeout=30"
+curl -X GET "http://127.0.0.1:20012/aws-token?url=https://target.cc/waitlist&timeout=30"
 ```
 
 ##### D. Google reCAPTCHA v3 (`GET` atau `POST` ke `/recaptchaV3`)
 * **Menggunakan HTTP GET:**
 ```bash
-curl -X GET "http://127.0.0.1:8001/recaptchaV3?url=https://target.cc&sitekey=6Ldqxxxxxxxxxxxxxx19Tpa1XsSZfIW&action=submit"
+curl -X GET "http://127.0.0.1:20012/recaptchaV3?url=https://target.cc&sitekey=6Ldqxxxxxxxxxxxxxx19Tpa1XsSZfIW&action=submit"
 ```
 * **Menggunakan HTTP POST (JSON Body):**
 ```bash
-curl -X POST "http://127.0.0.1:8001/recaptchaV3" \
+curl -X POST "http://127.0.0.1:20012/recaptchaV3" \
      -H "Content-Type: application/json" \
      -d '{"url": "https://target.cc", "sitekey": "6Ldqxxxxxxxxxxxxxx19Tpa1XsSZfIW", "action": "submit"}'
 ```
@@ -166,7 +166,7 @@ Anda wajib melakukan **polling request** ke endpoint ini tiap (minimal) 1 detik 
 
 **Contoh Request Polling (cURL):**
 ```bash
-curl -X GET "http://127.0.0.1:8001/result?id=8a31e3d4-b41e-450f-a63c-94cc8193eb41"
+curl -X GET "http://127.0.0.1:20012/result?id=8a31e3d4-b41e-450f-a63c-94cc8193eb41"
 ```
 
 **Contoh Response Sukses dari Turnstile / reCAPTCHA v3:**

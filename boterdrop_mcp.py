@@ -3,7 +3,7 @@
 
 Provides Turnstile, Cloudflare Clearance, and AWS WAF token solving capabilities
 directly to Hermes through MCP protocol over stdio.
-Connects automatically to Boterdrop Pool Gateway (default http://127.0.0.1:8000).
+Connects automatically to Boterdrop Pool Gateway (default http://127.0.0.1:20012).
 """
 from __future__ import annotations
 
