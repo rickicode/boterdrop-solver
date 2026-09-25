@@ -31,11 +31,10 @@ A high-performance solver for Cloudflare Turnstile CAPTCHA, cf_clearance, Recapt
 Pull the pre-built image from GHCR (auto-published by CI on every push to `main`):
 
 ```bash
-# Run solver (port 20011, RAM capped at 3 GB)
+# Run solver (port 20011)
 docker run -d --name boterdrop-solver \
   --restart unless-stopped \
   -p 20011:8002 \
-  --memory=3g --memory-swap=4g --cpus=4 --shm-size=1g \
   ghcr.io/rickicode/boterdrop-solver:latest
 ```
 
