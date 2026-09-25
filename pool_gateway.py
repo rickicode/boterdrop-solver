@@ -408,7 +408,7 @@ async def get_result(id: str = Query(...)):
 
 
 def main():
-    port = int(os.environ.get("GATEWAY_PORT", "8000"))
+    port = int(os.environ.get("GATEWAY_PORT", "20012"))
     uvicorn.run("pool_gateway:app", host="0.0.0.0", port=port, log_level="warning",
                 access_log=False)
 
