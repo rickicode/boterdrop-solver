@@ -31,10 +31,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("boterdrop_pool")
 
 # Default upstream workers (can be overridden via BOTERDROP_NODES env: "url1,url2")
-DEFAULT_NODES = [
-    {"name": "laptop", "url": "http://laptop-host.example.com:20011", "weight": 2},
-    {"name": "vps_local", "url": "http://127.0.0.1:20011", "weight": 1},
-]
+# Node internal TIDAK di-hardcode di repo publik. Wajib lewat env BOTERDROP_NODES
+# (contoh format di .env.example). Kosong = gateway menolak submit (503).
+DEFAULT_NODES: list[dict] = []
 
 env_nodes = os.environ.get("BOTERDROP_NODES", "").strip()
 if env_nodes:

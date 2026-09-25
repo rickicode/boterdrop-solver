@@ -2,8 +2,7 @@
 """Boterdrop captcha solver client — pool + load balancer otomatis.
 
 Node pool (failover per-REQ, bukan sekali saat startup):
-  1. Boterdrop laptop  (http://laptop-host.example.com:20011)  - offload CPU/RAM
-  2. Boterdrop Docker  (http://127.0.0.1:20011)      - lokal, selalu ada
+  Node di-resolve dari env BOTERDROP_URLS / BOTERDROP_URL (lihat .env.example).
 
 Endpoint upstream per node:
   GET /turnstile?url=<url>&sitekey=<key>      -> {"value": "<token>"}
@@ -38,12 +37,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-NODE_CANDIDATES = [
-    ("cloud", "http://node-cloud.example.com:11473"),  # utama: cloud node
-    ("laptop", "http://laptop-host.example.com:20011"),                        # cadangan: laptop
-    ("gateway", "http://127.0.0.1:20012"),                          # cadangan: local pool gateway
-    ("local_docker", "http://127.0.0.1:20011"),                     # cadangan: docker lokal
-]
+NODE_CANDIDATES: list[tuple[str, str]] = []  # wajib via env BOTERDROP_URLS / BOTERDROP_URL
+                                             # (lihat .env.example; node internal tidak di-commit)
 HEALTH_TTL = 20.0        # detik sebelum health di-check ulang
 HEALTH_TIMEOUT = 1.5
 
@@ -68,7 +63,7 @@ def get_default_boterdrop_base() -> str:
     for name, base in nodes:
         if _probe(base):
             return base
-    return "http://node-cloud.example.com:11473"
+    return ""
 
 
 def _probe(base: str) -> bool:
@@ -110,7 +105,7 @@ class BoterdropPool:
         """Round-robin antar node sehat; kalau semua tidak sehat pakai lokal."""
         healthy = self.healthy_nodes()
         if not healthy:
-            return "http://node-cloud.example.com:11473"
+            return ""
         for _ in range(len(self.nodes)):
             base = next(self._rr)
             if base in healthy:

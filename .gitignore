@@ -16,3 +16,6 @@ debug_logs/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# env template IS committed (no secrets)
+!.env.example

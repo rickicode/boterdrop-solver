@@ -6,14 +6,15 @@ Usage:
     python3 solve.py --health
     python3 solve.py --serve          # show server status
 
-Server: http://127.0.0.1:20012  (pool gateway: auto-failover 3 node)
+Server: $BOTERDROP_URL (lihat .env.example)
 """
+import os
 import sys
 import time
 
 import requests
 
-SOLVER = "http://127.0.0.1:20012"  # pool gateway
+SOLVER = os.environ.get("BOTERDROP_URL", "http://127.0.0.1:20012").rstrip("/")
 
 
 def health() -> int:

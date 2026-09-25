@@ -3,7 +3,7 @@
 
 Provides Turnstile, Cloudflare Clearance, and AWS WAF token solving capabilities
 directly to Hermes through MCP protocol over stdio.
-Connects automatically to Boterdrop Pool Gateway (default http://127.0.0.1:20012).
+Endpoint di-resolve dari env BOTERDROP_URL / BOTERDROP_GATEWAY_URL / BOTERDROP_NODES.
 """
 from __future__ import annotations
 
@@ -18,19 +18,16 @@ from mcp.server.fastmcp import FastMCP
 def get_boterdrop_gateway() -> str:
     """Auto-detect active Boterdrop solver endpoint.
     
-    Priority:
-    1. BOTERDROP_GATEWAY_URL / BOTERDROP_URL env if provided
-    2. Pool Gateway (http://127.0.0.1:20012) - UTAMA (auto-failover 3 node)
-    3. Local Docker Boterdrop (http://127.0.0.1:20011) - CADANGAN
+    Priority: BOTERDROP_GATEWAY_URL > BOTERDROP_URL > first healthy in BOTERDROP_NODES.
     """
     env = os.environ.get("BOTERDROP_GATEWAY_URL") or os.environ.get("BOTERDROP_URL")
     if env:
         return env.rstrip("/")
 
     candidates = [
-        "http://127.0.0.1:20012",   # pool gateway: auto failover
-        "http://laptop-host.example.com:20011",
-        "http://127.0.0.1:20011",
+        u.strip().rstrip("/")
+        for u in os.environ.get("BOTERDROP_NODES", "").split(",")
+        if u.strip()
     ]
     for url in candidates:
         try:
@@ -39,7 +36,7 @@ def get_boterdrop_gateway() -> str:
                 return url
         except Exception:
             continue
-    return "http://127.0.0.1:20012"
+    return candidates[0] if candidates else ""
 
 
 GATEWAY_URL = get_boterdrop_gateway()
