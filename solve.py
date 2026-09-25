@@ -6,14 +6,14 @@ Usage:
     python3 solve.py --health
     python3 solve.py --serve          # show server status
 
-Server: http://127.0.0.1:8002  (systemd user unit: boterdrop-solver.service)
+Server: http://127.0.0.1:20011  (Docker container: boterdrop-solver)
 """
 import sys
 import time
 
 import requests
 
-SOLVER = "http://127.0.0.1:8002"
+SOLVER = "http://127.0.0.1:20011"
 
 
 def health() -> int:

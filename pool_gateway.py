@@ -32,8 +32,8 @@ logger = logging.getLogger("boterdrop_pool")
 
 # Default upstream workers (can be overridden via BOTERDROP_NODES env: "url1,url2")
 DEFAULT_NODES = [
-    {"name": "laptop", "url": "http://laptop-host.example.com:8001", "weight": 2},
-    {"name": "vps_local", "url": "http://127.0.0.1:8002", "weight": 1},
+    {"name": "laptop", "url": "http://laptop-host.example.com:20011", "weight": 2},
+    {"name": "vps_local", "url": "http://127.0.0.1:20011", "weight": 1},
 ]
 
 env_nodes = os.environ.get("BOTERDROP_NODES", "").strip()
